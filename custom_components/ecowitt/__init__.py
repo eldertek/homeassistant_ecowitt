@@ -17,9 +17,14 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_registry import (
-    async_get_registry as async_get_entity_registry,
-)
+try:
+    from homeassistant.helpers.entity_registry import (
+        async_get as async_get_entity_registry,
+    )
+except ImportError:
+    from homeassistant.helpers.entity_registry import (
+        async_get_registry as async_get_entity_registry,
+    )
 
 from homeassistant.const import (
     CONF_PORT,
@@ -249,10 +254,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.error("No sensors found to monitor, check device config.")
             return False
 
-        for component in ECOWITT_PLATFORMS:
-            hass.async_create_task(
-                hass.config_entries.async_forward_entry_setup(entry, component)
-            )
+        hass.async_create_task(
+            hass.config_entries.async_forward_entry_setups(entry, ECOWITT_PLATFORMS)
+        )
 
         ecowitt_data[DATA_READY] = True
 
@@ -418,7 +422,9 @@ class EcowittEntity(Entity):
 
         if self._key in discovery_info.keys():
 
-            registry = await async_get_entity_registry(self.hass)
+            registry = async_get_entity_registry(self.hass)
+            if hasattr(registry, "__await__"):
+                registry = await registry
 
             entity_id = registry.async_get_entity_id(
                 discovery_info[self._key], DOMAIN, self.unique_id
